@@ -1,0 +1,495 @@
+---
+title: "Who Lives Longer, Men or Women?"
+author: "Charlene Fasuyi"
+date: "13/12/2024"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE)
+```
+
+
+```{r Libraries used}
+library(rnaturalearth) # Provides map data for countries, used for creating the base world map.
+library(rnaturalearthdata) # Provides additional data for map plotting
+library(ggrepel) # For plot customisation of the sex_by_age_graph
+library(plotly) # For adding interactive feautures to graphs
+library(tidyverse) # For all data wrangling
+library(scales)# For transforming data from a scientific format data that is easier to understand
+```
+
+# {.tabset}
+
+## Introduction
+```{r Importing Global Sex ratio data}
+fem_pop <- read_csv("Files/share-population-female.csv")
+
+```
+
+
+```{r Cleaning sex ratio data}
+fem_pop <- fem_pop %>% 
+               filter(Year > 1969) %>% # Set a limit of 1970 and above
+               rename(Country = Entity,
+                      Female_Population = `Population, female (% of total population)`)  # Renamed too long column headers
+```
+
+
+```{r Data analysis of the female population}
+fem_pop_avg_yr <- fem_pop %>% 
+  group_by(Year) %>% 
+  summarise(mean(Female_Population)) # Avg female population since 1970
+
+avg_fem_pop <- fem_pop_avg_yr %>% 
+  summarise(mean(`mean(Female_Population)`)) # Avg is 50, meaning that at any given time there is an average equal amount of men and women on earth. 
+```
+
+
+```{r Prepare female ratio data for plotting}
+fem_pop_2022 <- fem_pop %>% 
+                    filter(Year == 2022) %>% 
+                    mutate(Female_Population = round(Female_Population, 2))
+```
+
+
+```{r Data for map plotting}
+# Load world map data
+world <- ne_countries(scale = "medium", returnclass = "sf")
+```
+
+
+```{r Joined map and plotting data}
+# Joined population and world map data by country code. 
+map_data <- world %>%
+               left_join(fem_pop_2022, 
+               by = c("brk_a3" = "Code"))
+```
+
+
+```{r World Female Population}
+fem_pop_map <-  map_data %>% 
+                      ggplot(
+                            ) +
+                            geom_sf(
+                                aes(fill = Female_Population, # Colours graph according to female population
+                                    text = paste("Country: ", Country,  
+                                                 "\nFemale Population: ", Female_Population) #Specifies pop_up info on map
+                                                ),
+                                color = "black", 
+                                         size = 0.1 # Makes country boundaries black
+                            ) + 
+                            scale_fill_distiller(
+                                                na.value = "grey80", # Colours NA values grey
+                                                palette = "RdYlGn",
+                                                direction = 1
+                            ) +
+                            theme_minimal()
+```
+<br><br>
+   <p style="font-size: 18px; color: black;">As shown in the graph below, at any given time of the year, the global ratio of men to women is approximately equal. However, this balance can be deceptive when viewed at a deeper level. In this analysis, I will explore whether this equality holds across different age groups. If it does, what factors maintain it? If not, what forces are driving disparities in the gender ratio as people age? Through this investigation, I aim to uncover the hidden dynamics shaping the global gender balance.</p>
+<br><br><br><br>
+
+<p style="font-size: 10px; color: black;">Data Source: Multiple sources compiled by World Bank (2024) – processed by Our World in Data</p>
+```{r Displaying the World Map}
+# Transform into an interactive graph
+plotly_map <- ggplotly(fem_pop_map, tooltip = "text")
+
+plotly_map <- plotly_map %>%
+                      layout(
+                            title = list(
+                                        text = "Ratio of the Population that is Female",
+                                        y = 0.86,
+                                        xanchor = "center"
+                                        ),
+                            width = 1000,
+                            height = 600
+                          )
+plotly_map
+```
+
+
+
+## Sex ratio per Age Group
+```{r Imported and cleaned sex ratio dataset, echo=FALSE, message=FALSE}
+sex_by_age <-read_csv("Files/sex-ratio-by-age.csv")
+
+# Removed unnecessary text from column titles
+names(sex_by_age) <- names(sex_by_age) %>% 
+                                  stringr::str_replace_all(pattern = "Sex ratio - Sex: all - Age: ", 
+                                                           replacement = "") %>% 
+                                  stringr::str_replace_all(pattern = " - Variant: estimates",
+                                                           replacement = "_years_old")
+```
+
+
+```{r Preparing Sex ratio table for plotting}
+# Pivoted longer/transposed table putting all columns of age groups into one single column
+sex_by_age <-  sex_by_age %>% 
+                   pivot_longer(cols = contains("years"), 
+                                names_to = "Age_group",
+                                values_to = "Males_per_100_females")
+
+sex_by_age <- sex_by_age %>% mutate(Males_per_100_females = round(Males_per_100_females))
+```
+
+
+```{r Creating line labels}
+# Filtered for 2023 so the labels get added only at the end of the graph
+label_data <- sex_by_age %>% 
+                    group_by(Age_group) %>%
+                    filter(Year == 2023) 
+```
+
+
+```{r Renaming 0_years rows to birth}
+sex_by_age$Age_group <- ifelse(sex_by_age$Age_group == "0_years_old", 
+                               "Birth", 
+                               sex_by_age$Age_group)
+```
+
+
+```{r Line graph colours}
+#Created custom colours for the graph.
+color_palette <- c("#993404","#E69F00", "#74c476", "#009E73","#993404", "#af8dc3","#56B4E9", "#009E73","#E69F00","#56B4E9", "#74c47d", "#af8dc3", "#993404")
+```
+
+<br><br>
+<p style="font-size: 18px; color: black;"> Interestingly, men tend to outnumber women up until their 30s, after which their numbers begin a steady decline. This pattern is particularly striking given that male infants are biologically more susceptible to disease and have higher rates of infant mortality. It raises an intriguing question: how can the global gender balance remain equal on average when men’s life expectancy starts to drop so early? This observation suggests that deeper forces are at play in maintaining or disrupting this balance.</p>
+<br><br><br><br><br><br>
+
+```{r Sex by age graph creation, fig.width=17, fig.height=10}
+sex_by_age_graph <-  ggplot(
+                     sex_by_age, aes(
+                                   x= Year, 
+                                   y= Males_per_100_females, 
+                                   group = Age_group)
+                                   ) +
+                                   geom_line(aes(colour = Age_group) # Plots a line graph and colours based on the age group
+                                   ) +
+                                   geom_text_repel(
+                                                  data = label_data,
+                                                  aes(
+                                                     label = Age_group, 
+                                                     colour = Age_group),
+                                                     nudge_x = 2,       # Push labels slightly to the right
+                                                     nudge_y = -5,
+                                                     direction = "y",   # Arrange labels vertically
+                                                     hjust = 0,         # Align labels to the left
+                                                     segment.color = "black",  # Draw connecting lines
+                                                     segment.size = 0.2
+                                  ) +
+                                  labs(
+                                      title = "Sex Ratio by Age (1970 - 2023)",
+                                      subtitle = "The sex ratio is measured as the number of men per 100 women.",
+                                      y = "",
+                                      caption = "Data Source: UN, World Population Prospects (2024) – processed by Our World in Data"
+                                      ) +
+                                      scale_x_continuous(limits = c(1970, 2025) # Used a slightly scale to add more space for annotations
+                                      ) +
+                                      scale_color_manual(values = color_palette
+                                      ) +
+                                      theme_minimal(base_size = 15
+                                      ) + 
+                                      theme(plot.title = element_text(size = 28, hjust = 0.5),  # Title size and alignment.
+                                            plot.subtitle = element_text(size = 20, hjust = 0.5),  # Subtitle size and alignment.
+                                            plot.caption = element_text(size = 12, hjust = 0), # Caption size and alignment.
+                                            legend.position = "none",     # Removes the legend
+                                            panel.grid.major = element_line(color = "grey85"),  # Adjust grid line color
+                                            panel.grid.minor = element_blank(),
+                                      )
+sex_by_age_graph
+```
+
+
+## Missing Women
+```{r Importing missing women data}
+miss_wom <- read_csv("Files/missing-female-births-and-excess-mortality.csv")
+
+```
+
+
+```{r Cleaning of missing women data}
+#Removed unneeded country code column 
+miss_wom <- miss_wom %>% 
+                 filter(Year <= 2025) %>% 
+                 select (1, 3, 4, 5)
+
+#Removed uneeded prefixes in column headers
+names(miss_wom) <- names(miss_wom)  %>% stringr::str_replace_all(pattern = " \\(Bongaarts & Guilmoto, 2015\\)", 
+                                                                 replacement = "") %>% 
+                                        stringr::str_replace_all(pattern = " ", 
+                                                                 replacement = "_")
+```
+
+
+```{r Total Missing Women}
+miss_wom <- miss_wom %>% 
+                     mutate(Total_Missing_Women = Missing_female_births + Excess_female_deaths)
+```
+
+
+```{r Data remodeling for analysis}
+# Pivoted to make it easier to calculate individual row percentages
+miss_wom_pivot <- miss_wom %>% select (1, 2, 5) %>% 
+                          pivot_wider(names_from = Year,
+                                      values_from = Total_Missing_Women)
+```
+
+
+```{r Descriptive Stats for world}
+# Calculate on average how many missing womean are there each year
+annual_mw <- miss_wom %>% 
+                  filter(Entity == "World") %>% 
+                  summarise(mean(Total_Missing_Women))
+```
+
+
+```{r Descriptive stats for China}
+# Percent of World M.W from China
+china_mw <- (miss_wom_pivot[1,2:ncol(miss_wom_pivot)] / miss_wom_pivot[4,2:ncol(miss_wom_pivot)]) * 100 
+
+# Pivoted longer  for better visualisation and in preparation of future join
+china_mw <- china_mw %>% pivot_longer(cols = names(china_mw),
+                          names_to = "Year",
+                          values_to = "Percent_Missing") %>% 
+            mutate(Entity = "China") %>% 
+            mutate(Year = as.double(Year))
+```
+
+
+```{r Descriptive stats for India}
+# Percent of World M.W from India
+india_mw <- (miss_wom_pivot[2,2:ncol(miss_wom_pivot)] / miss_wom_pivot[4,2:ncol(miss_wom_pivot)]) * 100 
+
+# Pivoted longer  for better visualisation and in preparation of future join
+india_mw <- india_mw %>% 
+                  pivot_longer(cols = names(india_mw),
+                                      names_to = "Year",
+                                      values_to = "Percent_Missing") %>% 
+                  mutate(Entity = "India") %>% 
+                  mutate(Year = as.double(Year))
+```
+
+
+```{r Descriptive stats for Rest of the World}
+# Percent of Rest of World M.W.
+rest_mw <- (miss_wom_pivot[3,2:ncol(miss_wom_pivot)] / miss_wom_pivot[4,2:ncol(miss_wom_pivot)]) * 100 
+
+rest_mw <- rest_mw %>% pivot_longer(cols = names(rest_mw),
+                                    names_to = "Year",
+                                    values_to = "Percent_Missing") %>% 
+                                    mutate(Entity = "Rest of World") %>% 
+                                    mutate(Year = as.double(Year))
+```
+
+
+```{r Joining descriptive stats to table}
+# Joined data appropriately to get clearer picture and understanding of data
+miss_wom <-  miss_wom %>% 
+                  left_join(rbind(china_mw, 
+                                  india_mw, 
+                                  rest_mw), 
+                            by = c("Entity", "Year")) 
+```
+
+
+```{r Data preparation for plotting}
+# Transformed Entity name to a factor to allow for ordered plotting
+miss_wom$Entity <- fct_relevel(miss_wom$Entity)
+
+# Filtered out world from data and rounded data for easier understanding
+miss_wom_plot <- miss_wom %>% 
+                      filter(Entity != "World") %>% 
+                      mutate(Percent_Missing = round(Percent_Missing, 2)) %>% 
+                      rename("Missing Women" = Total_Missing_Women)
+```
+
+
+<br><br>
+<p style="font-size: 16px; color: black;">"Missing women" refers to the number of women who would be alive today if not for sex-based discrimination and harmful societal practices. This includes the number of girls who are never born due to sex-selective abortion, and the excess female mortality caused by infanticide or neglect. On average, there are approximately 2,837,273 missing women annually. As of the latest data collection in 2015, China led the world, accounting for 43% of the missing women, followed by India at 30%, and the rest of the world contributing the remaining 25%. However, it’s important to note that China and India together make up about 2/8 of the world’s population, which suggests that this data may be disproportionately influenced by these two countries. This could skew the numbers, although it also points to the challenges these nations face in addressing sex-selective practices. Despite governmental bans on sex-selective abortion in both China and India, the persistence of these practices suggests that policies alone have not been entirely successful in eradicating the problem. This highlights the deep-rooted cultural preferences for male children and the complex barriers to change.</p>
+<br><br><br><br><br><br>
+
+
+<p style="font-size: 10px; color: black;">Data Source: Missing women estimates (Bongaarts & Guilmoto, 2015) – processed by Our World in Data</p>
+\n
+```{r Plotting the Missing women graph}
+miss_wom_plot <- miss_wom_plot %>% ggplot(aes(
+                        x= Year,
+                        y= `Missing Women`,
+                        fill = Entity)
+             ) +
+             geom_col(position = "stack",
+                      aes(text = paste("Year: ",  Year,
+                                       "\nCountry: ", Entity,
+                                       "\nMissing Women: ", scales::comma(`Missing Women`),
+                                       "\nPercent Missing: ", Percent_Missing))
+             ) +
+             scale_y_continuous(
+               breaks = c(0, 500000, 1000000, 2000000, 3000000),            # Manually set breaks
+               labels = c("0", "500,000", "1 million", "2 million", "3 million")            # Manually set labels with suffixes
+             ) +
+  scale_fill_manual(values = c("#FF5722",   # Orange for oil
+                      "#FF8C42",   # Lighter orange for gas
+                      "#FFB300")
+                    ) +
+  theme_minimal()
+```
+
+
+```{r Customising the Missing women graph}
+# Transformed into an interactive plotly map
+miss_wom_plotly <- ggplotly(miss_wom_plot, tooltip = "text")
+
+miss_wom_plotly %>%
+            layout(
+                  title = list( 
+                              text = "Annual Number of Missing Women",
+                              x = 0.5,
+                              y = 0.97,
+                              xanchor = "center",
+                              font = list(size = 25)
+                              ),
+                 yaxis = list(
+                             title = list(standoff = 2),
+                             titlefont = list(size = 18)
+                             ),
+                 xaxis = list(
+                             title = "Year"),
+                 width = 1000,
+                 height = 600
+                             )
+```
+
+
+
+## Causes of Death in Males
+
+
+```{r Load and Clean Data for Drug Deaths}
+# Load and clean the drug deaths data
+drug_deaths <- read_csv("Files/deaths-alcohol-drugs-by-sex-who.csv")
+
+# Clean column names by removing the to long beginning 
+names(drug_deaths) <- names(drug_deaths) %>% 
+                                 str_remove_all(pattern = "Total deaths from substance use disorders among ")
+```
+
+
+```{r Prepare the World Data on Drug Deaths}
+# Prepare the data for plotting
+world_drug_deaths <- drug_deaths %>% 
+                            select(3, 4, 5) %>%   # Selected general world data only
+                            pivot_longer(cols = contains("male"),
+                                         names_to = "Sex",
+                                         values_to = "Num_of_Deaths") %>% # Combined all gender info into one column for easier analysis and plotting
+                            group_by(Year, Sex) %>% 
+                            summarise(sum(Num_of_Deaths)) %>% # Summed the number of deaths per gender for each year
+                            ungroup()
+```
+
+
+```{r Descriptive drugs data}
+top_m_f <- world_drug_deaths %>% 
+                      group_by(Sex) %>% 
+                      summarise(max(`sum(Num_of_Deaths)`)) # Calculated the highest amount of deaths from substance related death
+
+```
+
+
+<br><br>
+<p style="font-size: 16px; color: black;">Substance use disorders and cardiovascular diseases are among the leading causes of death worldwide, with both conditions being notably more prevalent in men than women. These health issues likely contribute to the decline in the male population as they age, particularly as the onset of substance use and experimentation often occurs in one’s 20s and 30s. As seen in the data for 2021, women had a death rate of 217,057.3 due to substance abuse, while men had a significantly higher rate of 780,909.1. A similar trend is observed with cardiovascular disorders, which, although declining globally, still disproportionately affect men, leading to higher mortality rates compared to women. This further supports the notion that men’s higher mortality rates in adulthood are influenced by both lifestyle factors, such as substance use, and health conditions, such as cardiovascular diseases.</p>
+<br><br><br><br><br><br>
+
+### Alcohol and Drug Related Deaths
+```{r Drug Deaths Plot, fig.width=15, fig.height=10}
+# Create a plot for drug-related deaths
+world_drug_deaths %>% 
+            ggplot(aes(
+                      x = Year, 
+                      y = `sum(Num_of_Deaths)`, 
+                      fill = Sex)
+            ) +
+            stat_smooth(
+                       geom = 'area', # Specifies that the graph type is an area plot
+                       method = 'loess', # Using LOESS (Locally Estimated Scatterplot Smoothing) for smooth curve fitting
+                       position = "stack", # Stacks the areas (for better visualization of the cumulative data)
+                       span = 1/3, # Adjusts the degree of smoothing (a smaller value increases the smoothness)
+                       alpha = 1  # Adjust transparency (1 is fully opaque, 0 is fully transparent)
+            ) + 
+            scale_fill_manual(values = c("#fddbc7", # Custom color palette for the areas
+                                         "#b2182b")
+            ) + 
+            theme(
+                 panel.grid.major.y = element_line(colour = "grey90"), # Light grid lines for better readability
+                 panel.background = element_rect(fill = "white")  # White background
+            ) +
+            labs(
+                x = "Year",
+                y = "Number of Deaths",
+                caption = "Data Source: World Health Organization (2024) – with major processing by Our World in Data"
+            ) +
+            theme(
+                 plot.caption = element_text(size = 10, hjust = 0) # Setting the caption text size and left-aligning it
+                 )
+```
+<br><br><br>
+
+### Cardiovascular Related Deaths
+```{r Load and Clean Data for Cardiovascular Deaths}
+cardio_death <- read_csv("Files/cardiovascular-disease-death-rate-over-time-males-vs-females.csv")
+
+# Clean column names by removing the "Age-standardized deaths from cardiovascular diseases in" part
+names(cardio_death) <- names(cardio_death) %>% 
+                                  str_remove_all(pattern = "Age-standardized deaths from cardiovascular diseases in ") %>% 
+                                  str_remove_all(pattern = " per 100,000 people")
+```
+
+
+```{r Prepare the World Cardiovascular Deaths Data}
+world_cardio_death <- cardio_death %>% 
+                              select(3, 4, 5) %>% # Selected only globally pertinent data 
+                              pivot_longer(cols = contains("male"),
+                                           names_to = "Sex",
+                                           values_to = "Num_of_Deaths") %>% # Combined all gender info into one column for easier analysis and plotting
+                              group_by(Year, Sex) %>% 
+                              summarise(sum(Num_of_Deaths)) %>% # Calculated the number of cardio related deaths for each gender per year
+                              ungroup()
+```
+
+
+```{r Cardiovascular deaths plot, fig.width=15, fig.height=10}
+# Create a plot for cardiovascular deaths
+world_cardio_death %>% 
+            ggplot(aes(x = Year, 
+                       y = `sum(Num_of_Deaths)`, 
+                       colour = Sex)
+            ) +
+            geom_line(size = 1 # Specifies the graph is a line plot 
+            ) +
+            scale_color_manual(values = c("#67a9cf", # Custom color palette for the lines
+                                          "#e6550d")
+            ) +
+            theme(
+                 panel.grid.major.y = element_line(colour = "grey90"), # Light grid lines for easier reading
+                 panel.background = element_rect(fill = "white"),  # White background
+                 plot.subtitle = element_text(size = 15, hjust = 0) # Title customization
+            ) +
+           scale_y_continuous(breaks = c(0, 1000, 10000, 20000, 30000) # Specified breaks for the y_axis for better readabilty
+           ) +
+           labs(
+               subtitle = "Per 100,000 People",
+               x = "Year",
+               y = "Number of Deaths",
+               caption = "Data Source: WHO Mortality Database (2024) – with minor processing by Our World in Data"
+            ) +
+           theme(
+                 plot.subtitle = element_text(size = 14, hjust = 0.5),  # Subtitle size and alignment.
+                 plot.caption = element_text(size = 10, hjust = 0) # Caption size and alignment.
+               )
+```
+
+
+## Conclusion
+<br><br><br>
+<p style="font-size: 20px; color: black;">The gender imbalance in global populations is not only shaped by biological factors but also by significant behavioral and health-related disparities. While women face early-life discrimination, men face higher mortality rates in adulthood due to higher rates of substance abuse, cardiovascular diseases, and other risk-taking behaviors. These factors combine to create a complex and dynamic picture of gender and survival across age groups, highlighting the importance of addressing both social and health factors to improve life expectancy for both genders.</p>
