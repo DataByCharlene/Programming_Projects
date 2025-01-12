@@ -11,5 +11,6 @@
 # Python Projects
 
  - [Data-Driven Product Management: Conducting a Market Analysis](https://www.datacamp.com/datalab/w/8146d477-c063-499c-964f-ea951c431ec4/edit)
+ - [Analyzing Crime in Los Angeles](https://www.datacamp.com/datalab/w/935c5bf2-cb55-4153-84b9-66b672f39908/edit)
  - [Exploring NYC Public School Test Result Scores](https://www.datacamp.com/datalab/w/2f5373a7-375c-4669-a286-475bb5feb3bd/edit)
  - [Examining the History of Lego Sets](https://www.datacamp.com/datalab/w/19eacac5-f9fa-46a5-9661-44360f27fb81/edit)
