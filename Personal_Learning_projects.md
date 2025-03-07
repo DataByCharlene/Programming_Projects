@@ -1,3 +1,7 @@
+# PowerBI Dashboard
+- [The Perfect Movie – An Amazon Production 🎬
+This Power BI dashboard, inspired by Amazon’s data-driven approach, analyzes past movie trends to identify the ideal budget, genre, production location, team, and release strategy for maximum profitability and prestige. Page 1 focuses on executive decisions (budget, location, and genre), while Page 2 refines the creative and marketing strategy (directors, stars, and release timing). Designed to be both fun and professional, it tells the story of how Amazon could create the next big hit using data!](https://app.powerbi.com/links/5cfqZCfFMa?ctid=538dc00c-d9ba-4814-ab23-584b8a2baac7&pbi_source=linkShare&bookmarkGuid=582f64ff-6120-4015-bdf8-8c76c166c47b)
+
 # SQL Projects
 
 - [Factors that Fuel Student Performance](https://www.datacamp.com/datalab/w/391bb975-6797-44d8-b43a-1857e45ac97b/edit)
